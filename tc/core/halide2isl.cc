@@ -343,6 +343,64 @@ bool isReductionUpdate(const Provide* op) {
 }
 
 /*
+ * If "op" performs a reduction, then return a mapping from
+ * the statement instances to the individual reductions.
+ * Otherwise, return an empty isl::union_map.
+ *
+ * "op" is considered to be a reduction if it has been marked
+ * as performing a reduction and if more than one statement instance
+ * is involved in the individual reductions.
+ *
+ * The space of the reduction is of the form R_<op->name>_<index>.
+ * Each reduction is indexed by the outer loop variables
+ * that are not marked as reduction variables.
+ * Since the loop variables that iterate over output tensor elements
+ * are never marked as reduction variables, this means in particular
+ * that all statement instances that belong to the same reduction
+ * write to the same tensor element.
+ */
+isl::union_map extractReduction(
+    const IterationDomain& iterationDomain,
+    const Provide* op,
+    size_t index) {
+  class FindReductionVars : public IRVisitor {
+    void visit(const Variable* op) {
+      if (op->reduction_domain.defined()) {
+        reductionVars.insert(op->name);
+      }
+    }
+
+   public:
+    // The variables that are known to be reduction variables.
+    std::unordered_set<std::string> reductionVars;
+  } finder;
+
+  if (!isReductionUpdate(op)) {
+    return isl::union_map::empty(iterationDomain.tuple.get_space().params());
+  }
+  op->accept(&finder);
+  if (finder.reductionVars.size() == 0) {
+    return isl::union_map::empty(iterationDomain.tuple.get_space().params());
+  }
+  auto ctx = iterationDomain.tuple.get_ctx();
+  auto list = isl::aff_list(ctx, 0);
+  for (auto id : iterationDomain.tuple.get_id_list()) {
+    if (finder.reductionVars.count(id.get_name()) == 1) {
+      continue;
+    }
+    auto aff = isl::aff::param_on_domain_space(iterationDomain.paramSpace, id);
+    aff = aff.unbind_params_insert_domain(iterationDomain.tuple);
+    list = list.add(aff);
+  }
+  auto domainSpace = iterationDomain.tuple.get_space();
+  isl::id id(ctx, kReductionLabel + op->name + "_" + std::to_string(index));
+  auto space = domainSpace.params().named_set_from_params_id(id, list.size());
+  space = domainSpace.product(space).unwrap();
+  auto reduction = isl::multi_aff(space, list);
+  return isl::union_map(isl::map(reduction));
+}
+
+/*
  * Take a parametric expression "f" and convert it into an expression
  * on the iteration domains in "domain" by reinterpreting the parameters
  * as set dimensions according to the corresponding tuples in "map".
@@ -369,7 +427,7 @@ onDomains(isl::aff f, isl::union_set domain, const IterationDomainMap& map) {
  * from outermost to innermost.
  * Return the schedule corresponding to the subtree at "s".
  *
- * "body" collects the accesses found along the way.
+ * "body" collects the accesses and reductions found along the way.
  * "accesses" collects the mapping from Call (for the reads) and Provide nodes
  * (for the writes) to the corresponding tag in the access relations.
  * "statements" collects the mapping from instance set tuple identifiers
@@ -460,9 +518,13 @@ isl::schedule makeScheduleTreeHelper(
     isl::union_map newReads, newWrites;
     std::tie(newReads, newWrites) =
         extractAccesses(iterationDomain, op, accesses);
+    // A tensor may be involved in multiple reductions.
+    // Use the statement index to differentiate between them.
+    auto newReduction = extractReduction(iterationDomain, op, stmtIndex);
 
     body->reads = body->reads.unite(newReads);
     body->writes = body->writes.unite(newWrites);
+    body->reductions = body->reductions.unite(newReduction);
 
   } else {
     LOG(FATAL) << "Unhandled Halide stmt: " << s;
