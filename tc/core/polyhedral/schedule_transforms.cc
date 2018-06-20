@@ -511,6 +511,15 @@ isl::multi_union_pw_aff partialScheduleMupa(
   return band ? prefix.flat_range_product(band->mupa_) : prefix;
 }
 
+ScheduleTree* insertTopLevelEmptyBand(ScheduleTree* root) {
+  auto node = root;
+  if (node->numChildren() > 0 &&
+      node->child({0})->elemAs<detail::ScheduleTreeElemContext>()) {
+    node = node->child({0});
+  }
+  return insertNodeBelow(node, ScheduleTree::makeEmptyBand(root));
+}
+
 void updateTopLevelContext(detail::ScheduleTree* root, isl::set context) {
   if (!matchOne(tc::polyhedral::domain(tc::polyhedral::context(any())), root)) {
     root->appendChild(ScheduleTree::makeContext(
