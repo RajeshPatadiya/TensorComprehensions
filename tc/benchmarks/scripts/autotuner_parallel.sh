@@ -19,6 +19,8 @@ export LOG_DIR=${TC_PREFIX}/tc/benchmarks/results_$(date +%m%d%y)/${DEVICE_NAME}
 mkdir -p ${LOG_DIR}
 chmod -R 777 ${LOG_DIR}
 
+. ${HOME}/conda/bin/activate
+
 cat ${TC_PREFIX}/tc/benchmarks/scripts/AUTOTUNER_COMMANDS | grep -v "\#" | head -n ${SLURM_ARRAY_TASK_ID} | tail -n 1 | xargs -i echo {} > ${LOG_DIR}/COMMAND
 cat ${TC_PREFIX}/tc/benchmarks/scripts/AUTOTUNER_COMMANDS | grep -v "\#" | head -n ${SLURM_ARRAY_TASK_ID} | tail -n 1 | xargs -i bash -c "{}"
 
