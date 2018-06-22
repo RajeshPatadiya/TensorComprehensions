@@ -199,9 +199,7 @@ const detail::ScheduleTree* findThreadMappingAncestor(
  * have different loops mapped to Thread::x, perform the check for each thread
  * mapping on the statements active at "node" (either a single ancestor,
  * or one or more descendants).
- * The iteration over the spaces is used to handle the case where
- * one of the subbranches does not access the tensor and
- * the scheduled accesses are empty.  The group is
+ * The group is
  * accessed in a coalesced way if all references in this group are accessed in
  * a coalesced way.
  */
@@ -222,19 +220,20 @@ bool promotionImprovesCoalescing(
     auto activePoints = activeDomainPoints(root, mapping);
     auto localAccesses = originalAccesses.intersect_domain(activePoints);
     auto schedule = prefixSchedule(root, marker);
-    auto scheduledAccesses = localAccesses.apply_domain(schedule);
-    for (auto access : isl::UnionAsVector<isl::union_map>(scheduledAccesses)) {
-      auto scheduleSpace = access.get_space().domain();
-      auto tensorSpace = access.get_space().range();
-      auto elementToNext = makeNextElementMap(
-          tensorSpace, tensorSpace.dim(isl::dim_type::set) - 1);
-      auto scheduleToNextX = makeNextElementMap(scheduleSpace, depth - 1);
-      auto accessedByAdjacentX =
-          scheduleToNextX.apply_domain(access).apply_range(access);
-
-      if (not accessedByAdjacentX.is_subset(elementToNext)) {
-        return true;
-      }
+    // Inside group, only one tensor is accessed, so the range of localAccesses
+    // lives in the single space.  After applying the partial schedule to the
+    // domain, the latter also lives in the single space.
+    auto scheduledAccesses =
+        isl::map::from_union_map(localAccesses.apply_domain(schedule));
+    auto scheduleSpace = scheduledAccesses.get_space().domain();
+    auto tensorSpace = scheduledAccesses.get_space().range();
+    auto elementToNext = makeNextElementMap(
+        tensorSpace, tensorSpace.dim(isl::dim_type::set) - 1);
+    auto scheduleToNextX = makeNextElementMap(scheduleSpace, depth - 1);
+    auto accessedByAdjacentX = scheduleToNextX.apply_domain(scheduledAccesses)
+                                   .apply_range(scheduledAccesses);
+    if (not accessedByAdjacentX.is_subset(elementToNext)) {
+      return true;
     }
   }
   return false;
