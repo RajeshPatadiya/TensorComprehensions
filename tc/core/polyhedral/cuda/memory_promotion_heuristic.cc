@@ -433,16 +433,35 @@ std::vector<detail::ScheduleTree*> bandsSplitAfterDepth(
  */
 void promoteToSharedBelow(
     Scop& scop,
-    detail::ScheduleTree* bandNode,
+    detail::ScheduleTree* node,
     size_t& remainingMemory) {
   auto root = scop.scheduleRoot();
-  auto partialSched = partialSchedule(root, bandNode);
+
+  // Promotion to shared below threads does not make sense because the computed
+  // groups would be specific to threads thus not benefiting from coalescing or
+  // inter-thread communication through shared memory (use registers instead).
+  auto ancestors = node->ancestors(root);
+  ancestors.push_back(node);
+  for (auto ancestor : ancestors) {
+    if (isMappingTo<mapping::ThreadId>(ancestor)) {
+      throw promotion::IncorrectScope(
+          "shared memory promotion below thread mapping");
+    }
+  }
+  // Children of a sequence/set band must be filters, but promotion would
+  // insert an extension node.
+  if (node->elemAs<detail::ScheduleTreeElemSequence>() ||
+      node->elemAs<detail::ScheduleTreeElemSet>()) {
+    throw promotion::IncorrectScope("cannot promote below a sequence/set node");
+  }
+
+  auto partialSched = partialSchedule(root, node);
   auto mapping = collectMappingsTo<mapping::BlockId>(scop);
 
   auto groupMap = TensorReferenceGroup::accessedWithin(
       partialSched.intersect_domain(mapping), scop.reads, scop.writes);
   // Pure affine schedule without (mapping) filters.
-  auto partialSchedMupa = partialScheduleMupa(root, bandNode);
+  auto partialSchedMupa = partialScheduleMupa(root, node);
 
   // Prepare groups for sorting, to have specified order necessary for
   // reproducibility and tests.
@@ -501,7 +520,7 @@ void promoteToSharedBelow(
       // Do not promote if the group features no reuse and is accessed in a
       // coalesced way.
       if (!hasReuseWithin(*group, partialSchedMupa) &&
-          !promotionImprovesCoalescing(root, bandNode, *group)) {
+          !promotionImprovesCoalescing(root, node, *group)) {
         continue;
       }
 
@@ -509,13 +528,13 @@ void promoteToSharedBelow(
           Scop::PromotedDecl::Kind::SharedMem,
           tensorId,
           std::move(group),
-          bandNode,
+          node,
           partialSched,
           true);
       remainingMemory -= memoryRequirement;
     }
   }
-  scop.insertSyncsAroundCopies(bandNode);
+  scop.insertSyncsAroundCopies(node);
 }
 
 /*
