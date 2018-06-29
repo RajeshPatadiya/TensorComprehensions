@@ -453,6 +453,10 @@ struct ScheduleTree {
     return type_;
   }
 
+  virtual std::ostream& write(std::ostream& os) const {
+    LOG(FATAL) << "NYI";
+  }
+
   //
   // Data members
   //
