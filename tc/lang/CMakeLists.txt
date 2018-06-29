@@ -4,10 +4,16 @@ add_library(
 
   SHARED
 
+  error_report.cc
   parser.cc
   lexer.cc
   tc_format.cc
 )
+
+target_link_libraries(
+  tc_lang
+
+  gflags)
 
 install(
   TARGETS
