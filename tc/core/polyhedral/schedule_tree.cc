@@ -225,10 +225,11 @@ std::unique_ptr<ScheduleTree> ScheduleTree::makeBand(
     isl::multi_union_pw_aff mupa,
     std::vector<ScheduleTreeUPtr>&& children) {
   isl::ctx ctx = mupa.get_ctx();
-  std::unique_ptr<ScheduleTree> res(new ScheduleTree(ctx));
-  res->elem_ = ScheduleTreeElemBand::fromMultiUnionPwAff(mupa);
-  res->type_ = detail::ScheduleTreeType::Band;
-  res->appendChildren(std::move(children));
+  std::unique_ptr<ScheduleTree> res(new ScheduleTree(
+      ctx,
+      std::move(children),
+      detail::ScheduleTreeType::Band,
+      ScheduleTreeElemBand::fromMultiUnionPwAff(mupa)));
   return res;
 }
 
@@ -245,11 +246,12 @@ std::unique_ptr<ScheduleTree> ScheduleTree::makeDomain(
     isl::union_set domain,
     std::vector<ScheduleTreeUPtr>&& children) {
   isl::ctx ctx(domain.get_ctx());
-  std::unique_ptr<ScheduleTree> res(new ScheduleTree(ctx));
-  res->elem_ = std::unique_ptr<ScheduleTreeElemDomain>(
-      new ScheduleTreeElemDomain(domain));
-  res->type_ = detail::ScheduleTreeType::Domain;
-  res->appendChildren(std::move(children));
+  std::unique_ptr<ScheduleTree> res(new ScheduleTree(
+      ctx,
+      std::move(children),
+      detail::ScheduleTreeType::Domain,
+      std::unique_ptr<ScheduleTreeElemDomain>(
+          new ScheduleTreeElemDomain(domain))));
   return res;
 }
 
@@ -257,11 +259,12 @@ std::unique_ptr<ScheduleTree> ScheduleTree::makeContext(
     isl::set context,
     std::vector<ScheduleTreeUPtr>&& children) {
   isl::ctx ctx(context.get_ctx());
-  std::unique_ptr<ScheduleTree> res(new ScheduleTree(ctx));
-  res->elem_ = std::unique_ptr<ScheduleTreeElemContext>(
-      new ScheduleTreeElemContext(context));
-  res->type_ = detail::ScheduleTreeType::Context;
-  res->appendChildren(std::move(children));
+  std::unique_ptr<ScheduleTree> res(new ScheduleTree(
+      ctx,
+      std::move(children),
+      detail::ScheduleTreeType::Context,
+      std::unique_ptr<ScheduleTreeElemContext>(
+          new ScheduleTreeElemContext(context))));
   return res;
 }
 
@@ -269,11 +272,12 @@ std::unique_ptr<ScheduleTree> ScheduleTree::makeFilter(
     isl::union_set filter,
     std::vector<ScheduleTreeUPtr>&& children) {
   isl::ctx ctx(filter.get_ctx());
-  std::unique_ptr<ScheduleTree> res(new ScheduleTree(ctx));
-  res->elem_ = std::unique_ptr<ScheduleTreeElemFilter>(
-      new ScheduleTreeElemFilter(filter));
-  res->type_ = detail::ScheduleTreeType::Filter;
-  res->appendChildren(std::move(children));
+  std::unique_ptr<ScheduleTree> res(new ScheduleTree(
+      ctx,
+      std::move(children),
+      detail::ScheduleTreeType::Filter,
+      std::unique_ptr<ScheduleTreeElemFilter>(
+          new ScheduleTreeElemFilter(filter))));
   return res;
 }
 
@@ -281,22 +285,24 @@ std::unique_ptr<ScheduleTree> ScheduleTree::makeExtension(
     isl::union_map extension,
     std::vector<ScheduleTreeUPtr>&& children) {
   isl::ctx ctx(extension.get_ctx());
-  ScheduleTreeUPtr res(new ScheduleTree(ctx));
-  res->elem_ = std::unique_ptr<ScheduleTreeElemExtension>(
-      new ScheduleTreeElemExtension(extension));
-  res->type_ = detail::ScheduleTreeType::Extension;
-  res->appendChildren(std::move(children));
+  ScheduleTreeUPtr res(new ScheduleTree(
+      ctx,
+      std::move(children),
+      detail::ScheduleTreeType::Extension,
+      std::unique_ptr<ScheduleTreeElemExtension>(
+          new ScheduleTreeElemExtension(extension))));
   return res;
 }
 
 std::unique_ptr<ScheduleTree> ScheduleTree::makeThreadSpecificMarker(
     isl::ctx ctx,
     std::vector<ScheduleTreeUPtr>&& children) {
-  ScheduleTreeUPtr res(new ScheduleTree(ctx));
-  res->elem_ = std::unique_ptr<ScheduleTreeElemThreadSpecificMarker>(
-      new ScheduleTreeElemThreadSpecificMarker());
-  res->type_ = detail::ScheduleTreeType::ThreadSpecificMarker;
-  res->appendChildren(std::move(children));
+  ScheduleTreeUPtr res(new ScheduleTree(
+      ctx,
+      std::move(children),
+      detail::ScheduleTreeType::ThreadSpecificMarker,
+      std::unique_ptr<ScheduleTreeElemThreadSpecificMarker>(
+          new ScheduleTreeElemThreadSpecificMarker())));
   return res;
 }
 

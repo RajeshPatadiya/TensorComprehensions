@@ -35,11 +35,12 @@ inline ScheduleTreeUPtr ScheduleTree::makeMapping(
   TC_CHECK_EQ(mappedIds.size(), mapping.size())
       << "some id is used more than once in the mapping";
   auto ctx = mappedIds[0].get_ctx();
-  ScheduleTreeUPtr res(new ScheduleTree(ctx));
-  res->elem_ = std::unique_ptr<ScheduleTreeElemMapping>(
-      new ScheduleTreeElemMapping(mapping));
-  res->type_ = ScheduleTreeType::Mapping;
-  res->appendChildren(std::move(children));
+  ScheduleTreeUPtr res(new ScheduleTree(
+      ctx,
+      std::move(children),
+      ScheduleTreeType::Mapping,
+      std::unique_ptr<ScheduleTreeElemMapping>(
+          new ScheduleTreeElemMapping(mapping))));
   return res;
 }
 } // namespace detail
